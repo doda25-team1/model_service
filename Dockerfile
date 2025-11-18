@@ -21,6 +21,8 @@ COPY smsspamcollection/ /app/smsspamcollection/
 
 RUN mkdir -p /app/output
 
-EXPOSE 8081
+ENV PORT=8081
+
+EXPOSE ${PORT}
 
 CMD ["python", "src/serve_model.py"]
