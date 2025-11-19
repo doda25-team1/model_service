@@ -25,4 +25,4 @@ ENV PORT=8081
 
 EXPOSE ${PORT}
 
-CMD ["sh", "-c", "python src/serve_model.py --port ${PORT}"]
+CMD ["python", "src/serve_model.py"]
