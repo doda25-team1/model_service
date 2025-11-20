@@ -25,6 +25,7 @@ jobs:
           distribution: 'temurin'
       - name: Install xmllstarlet
         run: |
+          sudo apt-get update
           sudo apt-get install -y xmlstarlet
           
       #Extract version from pom.xml
@@ -77,6 +78,7 @@ jobs:
       
       - name: Install xmllstarlet
         run: |
+          sudo apt-get update
           sudo apt-get install -y xmlstarlet
           
       #next snapshot version
