@@ -18,21 +18,19 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK
-        uses: actions/setup-java@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-      - name: Install xmllstarlet
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xmlstarlet
+          python-version: '3.12'
+      
+      - name: Install toml package
+        run: pip install toml
           
       #Extract version from pom.xml
-      - name: Extract version from pom.xml
+      - name: Extract version from pyproject.toml
         run: |
-          version=$(xmlstarlet sel -t -v "/*[local-name()='project']/*[local-name()='version']" pom.xml)
-          version=${version%-SNAPSHOT}
+          version=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+          version=${version%.dev*}
           echo "VERSION=$version" >> $GITHUB_ENV
       
       - name: Create GitHub Tag
@@ -70,34 +68,39 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK
-        uses: actions/setup-java@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          python-version: '3.12'
       
-      - name: Install xmllstarlet
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xmlstarlet
+      - name: Install toml package
+        run: pip install toml
           
       #next snapshot version
       - name: calculate next version
         run: |
-          version=$(xmlstarlet sel -t -v "/*[local-name()='project']/*[local-name()='version']" pom.xml)
-          curr_version=${version%-SNAPSHOT}
+          version=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+          curr_version=${version%.dev*}
           major=$(echo "$curr_version" | cut -d . -f 1)
           minor=$(echo "$curr_version" | cut -d . -f 2)
           patch=$(echo "$curr_version" | cut -d . -f 3)
           next_patch=$((patch+1)) 
-          new_version="${major}.${minor}.${next_patch}-SNAPSHOT"
+          new_version="${major}.${minor}.${next_patch}.dev0"
           echo "NEW_VERSION=$new_version" >> $GITHUB_ENV
               
       #Commit new version
       - name: commit new version
         run:  |
-          mvn versions:set -DnewVersion=${{ env.NEW_VERSION }} -DgenerateBackupPoms=false
+          python -c "
+          import toml
+          with open('pyproject.toml', 'r') as f:
+            data = toml.load(f)
+            data['project']['version'] = '${{ env.NEW_VERSION }}'
+          with open('pyproject.toml', 'w') as f:
+            toml.dump(data, f)
+          "
           git config user.name "GitHub Actions" 
           git config user.email "actions@github.com" 
+          git add pyproject.toml
           git commit -am "chore: bump version to ${{ env.NEW_VERSION }} [skip ci]" 
-          git push origin main
+          git push origin master
