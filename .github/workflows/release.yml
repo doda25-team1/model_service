@@ -80,11 +80,11 @@ jobs:
       - name: calculate next version
         run: |
           version=$(python -c "
-            import tomllib
-            with open('pyproject.toml','rb') as f:
-              v = tomllib.load(f)['project']['version']
-              print(v)
-            ")          
+          import tomllib
+          with open('pyproject.toml','rb') as f:
+            v = tomllib.load(f)['project']['version']
+            print(v)
+          ")       
           curr_version=${version%.dev*}
           major=$(echo "$curr_version" | cut -d . -f 1)
           minor=$(echo "$curr_version" | cut -d . -f 2)
@@ -92,18 +92,21 @@ jobs:
           next_patch=$((patch+1)) 
           new_version="${major}.${minor}.${next_patch}.dev0"
           echo "NEW_VERSION=$new_version" >> $GITHUB_ENV
-              
+
+      - name: Install tomli_w
+        run: pip install tomli_w   
+
       #Commit new version
       - name: commit new version
         run:  |
-          python -c "
-            import tomllib, tomli_w
-            with open('pyproject.toml','rb') as f:
-              data = tomllib.load(f)
-              data['project']['version'] = '${{ env.NEW_VERSION }}'
-            with open('pyproject.toml','w', encoding='utf-8') as f:
-              tomli_w.dump(data,f)
-          "
+          python - <<EOF
+          import tomllib, tomli_w
+          with open('pyproject.toml','rb') as f:
+            data = tomllib.load(f)
+            data['project']['version'] = '${{ env.NEW_VERSION }}'
+          with open("pyproject.toml", "wb") as f:
+            tomli_w.dump(data, f)
+          EOF
           git config user.name "GitHub Actions" 
           git config user.email "actions@github.com" 
           git add pyproject.toml
