@@ -23,13 +23,15 @@ jobs:
         with:
           python-version: '3.12'
       
-      - name: Install toml package
-        run: pip install toml
-          
       #Extract version from pom.xml
       - name: Extract version from pyproject.toml
         run: |
-          version=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+          version=$(python -c "
+          import tomllib
+          with open('pyproject.toml','rb') as f:
+            v = tomllib.load(f)['project']['version']
+            print(v)
+          ")
           version=${version%.dev*}
           echo "VERSION=$version" >> $GITHUB_ENV
       
@@ -72,14 +74,17 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.12'
-      
-      - name: Install toml package
-        run: pip install toml
+    
           
       #next snapshot version
       - name: calculate next version
         run: |
-          version=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+          version=$(python -c "
+            import tomllib
+            with open('pyproject.toml','rb') as f:
+              v = tomllib.load(f)['project']['version']
+              print(v)
+            ")          
           curr_version=${version%.dev*}
           major=$(echo "$curr_version" | cut -d . -f 1)
           minor=$(echo "$curr_version" | cut -d . -f 2)
@@ -92,12 +97,12 @@ jobs:
       - name: commit new version
         run:  |
           python -c "
-          import toml
-          with open('pyproject.toml', 'r') as f:
-            data = toml.load(f)
-            data['project']['version'] = '${{ env.NEW_VERSION }}'
-          with open('pyproject.toml', 'w') as f:
-            toml.dump(data, f)
+            import tomllib, tomli_w
+            with open('pyproject.toml','rb') as f:
+              data = tomllib.load(f)
+              data['project']['version'] = '${{ env.NEW_VERSION }}'
+            with open('pyproject.toml','w', encoding='utf-8') as f:
+              tomli_w.dump(data,f)
           "
           git config user.name "GitHub Actions" 
           git config user.email "actions@github.com" 
