@@ -63,6 +63,48 @@ model = joblib.load(MODEL_PATH)
 app = Flask(__name__)
 swagger = Swagger(app)
 
+@app.route('/health', methods=['GET'])
+def health():
+    """
+    Liveness probe endpoint.
+    Returns 200 OK if the application is running.
+    ---
+    responses:
+      200:
+        description: Service is alive
+    """
+    return jsonify({"status": "UP", "service": "model-service"}), 200
+
+
+@app.route('/ready', methods=['GET'])
+def ready():
+    """
+    Readiness probe endpoint.
+    Returns 200 OK if the model is loaded and ready to serve predictions.
+    ---
+    responses:
+      200:
+        description: Service is ready
+      503:
+        description: Service is not ready (model not loaded)
+    """
+    # Check if model files are loaded
+    if os.path.exists(MODEL_PATH) and os.path.exists(PREPROCESSOR_PATH):
+        return jsonify({
+            "status": "READY",
+            "model": "loaded",
+            "version": MODEL_VERSION,
+            "modelPath": MODEL_PATH
+        }), 200
+    else:
+        return jsonify({
+            "status": "NOT_READY",
+            "model": "not loaded",
+            "version": MODEL_VERSION,
+            "modelPath": MODEL_PATH
+        }), 503
+
+
 @app.route('/predict', methods=['POST'])
 def predict():
     """
@@ -90,7 +132,7 @@ def predict():
     sms = input_data.get('sms')
     processed_sms = prepare(sms)
     prediction = model.predict(processed_sms)[0]
-    
+
     res = {
         "result": prediction,
         "classifier": "decision tree",
