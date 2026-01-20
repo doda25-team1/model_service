@@ -4,11 +4,20 @@ Flask API of the SMS Spam detection model model.
 import joblib
 import os
 import requests
+import logging
 from flask import Flask, jsonify, request
 from flasgger import Swagger
 import pandas as pd
 
 from text_preprocessing import prepare, _extract_message_len, _text_process
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 
 # ========== Load Training Model ========== #
@@ -127,19 +136,40 @@ def predict():
     responses:
       200:
         description: "The result of the classification: 'spam' or 'ham'."
+      400:
+        description: "Invalid input - missing or empty SMS field."
+      500:
+        description: "Internal server error during prediction."
     """
-    input_data = request.get_json()
-    sms = input_data.get('sms')
-    processed_sms = prepare(sms)
-    prediction = model.predict(processed_sms)[0]
+    try:
+        input_data = request.get_json()
+        
+        # Validate input
+        if not input_data:
+            logger.warning("Received empty request body")
+            return jsonify({"error": "Request body cannot be empty"}), 400
+        
+        sms = input_data.get('sms')
+        
+        if not sms or not isinstance(sms, str) or sms.strip() == '':
+            logger.warning(f"Invalid SMS field: {sms}")
+            return jsonify({"error": "Field 'sms' is required and must be a non-empty string"}), 400
+        
+        # Predict
+        processed_sms = prepare(sms)
+        prediction = model.predict(processed_sms)[0]
 
-    res = {
-        "result": prediction,
-        "classifier": "decision tree",
-        "sms": sms
-    }
-    print(res)
-    return jsonify(res)
+        res = {
+            "result": prediction,
+            "classifier": "decision tree",
+            "sms": sms
+        }
+        logger.info(f"Prediction: '{sms[:50]}...' -> {prediction}")
+        return jsonify(res)
+        
+    except Exception as e:
+        logger.error(f"Prediction failed: {str(e)}", exc_info=True)
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8081))
