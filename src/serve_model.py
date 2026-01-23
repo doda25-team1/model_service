@@ -4,11 +4,37 @@ Flask API of the SMS Spam detection model model.
 import joblib
 import os
 import requests
-from flask import Flask, jsonify, request
+import time
+import logging
+from functools import wraps
+from flask import Flask, jsonify, request, g
 from flasgger import Swagger
 import pandas as pd
 
 from text_preprocessing import prepare, _extract_message_len, _text_process
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+def timed_request(f):
+    """Decorator to log request timing and details."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        start_time = time.time()
+        response = f(*args, **kwargs)
+        duration_ms = (time.time() - start_time) * 1000
+        
+        logger.info(
+            f"{request.method} {request.path} - "
+            f"Status: {response[1] if isinstance(response, tuple) else 200} - "
+            f"Duration: {duration_ms:.2f}ms"
+        )
+        return response
+    return decorated_function
 
 
 # ========== Load Training Model ========== #
@@ -64,6 +90,7 @@ app = Flask(__name__)
 swagger = Swagger(app)
 
 @app.route('/health', methods=['GET'])
+@timed_request
 def health():
     """
     Liveness probe endpoint.
@@ -77,6 +104,7 @@ def health():
 
 
 @app.route('/ready', methods=['GET'])
+@timed_request
 def ready():
     """
     Readiness probe endpoint.
@@ -106,6 +134,7 @@ def ready():
 
 
 @app.route('/predict', methods=['POST'])
+@timed_request
 def predict():
     """
     Predict whether an SMS is Spam.
@@ -138,7 +167,7 @@ def predict():
         "classifier": "decision tree",
         "sms": sms
     }
-    print(res)
+    logger.info(f"Prediction: '{sms[:50]}...' -> {prediction}")
     return jsonify(res)
 
 if __name__ == '__main__':
