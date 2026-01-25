@@ -156,19 +156,40 @@ def predict():
     responses:
       200:
         description: "The result of the classification: 'spam' or 'ham'."
+      400:
+        description: "Invalid input - missing or empty SMS field."
+      500:
+        description: "Internal server error during prediction."
     """
-    input_data = request.get_json()
-    sms = input_data.get('sms')
-    processed_sms = prepare(sms)
-    prediction = model.predict(processed_sms)[0]
+    try:
+        input_data = request.get_json()
+        
+        # Validate input
+        if not input_data:
+            logger.warning("Received empty request body")
+            return jsonify({"error": "Request body cannot be empty"}), 400
+        
+        sms = input_data.get('sms')
+        
+        if not sms or not isinstance(sms, str) or sms.strip() == '':
+            logger.warning(f"Invalid SMS field: {sms}")
+            return jsonify({"error": "Field 'sms' is required and must be a non-empty string"}), 400
+        
+        # Predict
+        processed_sms = prepare(sms)
+        prediction = model.predict(processed_sms)[0]
 
-    res = {
-        "result": prediction,
-        "classifier": "decision tree",
-        "sms": sms
-    }
-    logger.info(f"Prediction: '{sms[:50]}...' -> {prediction}")
-    return jsonify(res)
+        res = {
+            "result": prediction,
+            "classifier": "decision tree",
+            "sms": sms
+        }
+        logger.info(f"Prediction: '{sms[:50]}...' -> {prediction}")
+        return jsonify(res)
+        
+    except Exception as e:
+        logger.error(f"Prediction failed: {str(e)}", exc_info=True)
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8081))
